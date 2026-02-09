@@ -1,0 +1,8 @@
+flask
+psycopg2-binary
+flask-cors
+flask-sqlalchemy
+flask-migrate
+PyJWT
+pytest
+redis

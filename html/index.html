@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Buku Tamu Pro</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        padding: 20px;
+      }
+      .box {
+        border: 1px solid #ccc;
+        padding: 20px;
+        display: inline-block;
+        border-radius: 10px;
+      }
+      input {
+        margin: 5px;
+        padding: 8px;
+      }
+      table {
+        margin: 20px auto;
+        border-collapse: collapse;
+        width: 80%;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>🐳 Daftar Pengunjung</h1>
+      <input type="text" id="namaInput" placeholder="Nama Lengkap" />
+      <input type="text" id="telpInput" placeholder="Nomor Telepon" />
+      <button onclick="simpanData()">Simpan</button>
+      <p id="respon"></p>
+      <button
+        onclick="logout()"
+        style="
+          background: #ff4444;
+          color: white;
+          border: none;
+          padding: 5px 10px;
+          border-radius: 5px;
+          cursor: pointer;
+        "
+      >
+        Logout
+      </button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID (Auto)</th>
+          <th>Nama</th>
+          <th>Telepon</th>
+        </tr>
+      </thead>
+      <tbody id="isiTabel"></tbody>
+    </table>
+
+    <script>
+      async function getAuthToken() {
+        let token = localStorage.getItem("token_jwt");
+        if (!token) {
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: "admin", password: "123" }),
+          });
+          const data = await res.json();
+          if (data.token) {
+            token = data.token;
+            localStorage.setItem("token_jwt", token);
+          }
+        }
+        return token;
+      }
+
+      async function simpanData() {
+        const token = await getAuthToken();
+        const nama = document.getElementById("namaInput").value;
+        const telp = document.getElementById("telpInput").value;
+
+        const response = await fetch("/api/simpan", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ nama: nama, telepon: telp }),
+        });
+
+        const hasil = await response.json();
+
+        if (response.status === 401) {
+          localStorage.removeItem("token_jwt");
+          alert("Sesi habis, silakan klik simpan lagi.");
+          return;
+        }
+
+        document.getElementById("respon").innerText =
+          hasil.pesan || hasil.message;
+        muatData();
+      }
+
+      async function muatData() {
+        const token = await getAuthToken();
+        if (!token) return;
+
+        const response = await fetch("/api/tampil", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const data = await response.json();
+
+        // VALIDASI: Hanya map jika response sukses (Array)
+        if (response.ok && Array.isArray(data)) {
+          const tbody = document.getElementById("isiTabel");
+          tbody.innerHTML = data
+            .map(
+              (t) => `
+                <tr>
+                    <td>${t.id}</td>
+                    <td>${t.nama}</td>
+                    <td>${t.telepon || "-"}</td>
+                </tr>
+            `,
+            )
+            .join("");
+        } else if (response.status === 401) {
+          // Jika 401, hapus token lama agar getAuthToken memicu login baru
+          localStorage.removeItem("token_jwt");
+          console.log("Token kedaluwarsa, mencoba login ulang...");
+          muatData();
+        }
+      }
+
+      async function logout() {
+        const token = localStorage.getItem("token_jwt");
+        await fetch("/api/logout", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        localStorage.removeItem("token_jwt");
+        alert("Berhasil Logout!");
+        location.reload();
+      }
+
+      window.onload = muatData;
+    </script>
+  </body>
+</html>
